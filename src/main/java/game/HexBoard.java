@@ -16,14 +16,14 @@ public class    HexBoard {
 
     private static int rows;
     private static int columns;
-    private Hashtable<Integer, Integer> board;        // 0 is empty, 1 is blue and 2 is red
+    public int[] board;        // 0 is empty, 1 is blue and 2 is red
     private UnionFindForest<Integer> redForest = new UnionFindForest<>(); // player 2
     private UnionFindForest<Integer> blueForest = new UnionFindForest<>();// player 1
 
     public HexBoard(int rows, int columns){
         HexBoard.rows = rows;
         HexBoard.columns = columns;
-        board = new Hashtable<Integer, Integer>(rows*columns);
+        board = new int[rows*columns +1];
     }
 
     /**
@@ -32,13 +32,13 @@ public class    HexBoard {
      * otherwise, returns 0 if the move was recorded and valid
      */
     public int setBoard(int loc, int player){
-        Integer playerSpot = board.get(loc);
+        Integer playerSpot = board[loc];
         if (playerSpot != null && playerSpot!=0){
             return -1;
         }
 
         int[] neighborPlayerPieces = getNeighborPlayerPieces(loc, player);
-        board.put(loc, player);
+        board[loc] = player;
 
         if (player==1) {
             if (refreshForest(blueForest, loc, neighborPlayerPieces)){
@@ -76,7 +76,7 @@ public class    HexBoard {
         int[] out = new int[6];
         int[] locs = getNeighbors(loc);
         for (int i = 0; i < locs.length; i++){
-            Integer currLoc = board.get(locs[i]);
+            Integer currLoc = board[locs[i]];
             if (currLoc!=null&&currLoc==player){
                 out[i] = locs[i];
             }
@@ -149,12 +149,12 @@ public class    HexBoard {
     }
 
     private String hexSquare(int location){
-        Integer player = board.get(location);
-        if (player==null){
-            return "0";
-        } else if (player == 1){
+        if (board[location]==0){
+            return "" + 0;
+        }
+        else if (board[location]==1){
             return "\u001B[34m" + "B" + "\u001B[0m";
-        }else {
+        } else {
             return "\u001B[31m" + "R" + "\u001B[0m";
         }
     }

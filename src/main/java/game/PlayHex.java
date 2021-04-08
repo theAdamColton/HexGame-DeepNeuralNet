@@ -5,18 +5,27 @@ package game; /**
  *
  */
 
+import ai.djl.util.Hex;
+
+import java.util.Arrays;
+
 /**
  * Allows instantiation of the game and control of the turns.
  */
 public class PlayHex {
+    static final boolean DEBUG = true;
     static final String RESOURCE_PATH = "src/main/resources/";
     static boolean isVisible = true;                                                           // this controls whether the board is printed out
     public HexBoard HexBoard;
     public int player = 2;                                                                    // 1 is blue, 2 is red. This variable will always be the player who just went.
+    public int moves =0;
+    public int maxMoves;
     public PlayHex(){
         this.HexBoard = new HexBoard(11,11);
+        maxMoves = 11*11;
     }                   // defaults to 11x11
     public PlayHex(int rows, int columns){
+        maxMoves = rows*columns;
         this.HexBoard = new HexBoard(rows, columns);
     }
 
@@ -34,7 +43,28 @@ public class PlayHex {
             System.out.printf("Player %d takes: %d %n",player, location);
         }
 
-        return HexBoard.setBoard(location, player);
+        int result = HexBoard.setBoard(location,player);
+
+        if (result!=-1){
+            moves++;
+        }
+        return result;
+    }
+
+    /**
+     * returns a comprehensive list representation of the board. It would also be useful to know which player's turn it is.
+     */
+    public int[] getBoardList(){
+        if (DEBUG) System.out.println("getting board: " +
+                Arrays.toString(Arrays.copyOfRange(HexBoard.board, 1, HexBoard.board.length)));
+        return Arrays.copyOfRange(HexBoard.board, 1, HexBoard.board.length);          // index 0 is never used so it is removed.
+    }
+
+    /**
+     * @return True if the game is a draw and the board is saturated.
+     */
+    public boolean isDraw(){
+        return moves<=maxMoves;
     }
 
     /**
@@ -56,6 +86,7 @@ public class PlayHex {
         for (int move : moveList){
             int result = game.setMove(move);
             System.out.println(game.toString());
+            System.out.println(Arrays.toString(game.getBoardList()));
             if (result==1 || result==2){
                 System.out.printf("player %d won Hex!%n", result);
                 break;

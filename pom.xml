@@ -36,11 +36,19 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/ai.djl.mxnet/mxnet-native-auto -->
         <dependency>
+            <groupId>ai.djl.mxnet</groupId>
+            <artifactId>mxnet-engine</artifactId>
+            <version>0.10.0</version>
+        </dependency>
+        <dependency>
+            <!--
+                See https://github.com/awslabs/djl/blob/master/mxnet/mxnet-engine/README.md for more MXNet library selection options
+            -->
             <groupId>ai.djl.mxnet</groupId>
             <artifactId>mxnet-native-auto</artifactId>
             <version>1.7.0-backport</version>
+            <scope>runtime</scope>
         </dependency>
 
     </dependencies>
