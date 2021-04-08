@@ -17,11 +17,13 @@ public class    HexBoard {
 
     private static int rows;
     private static int columns;
-    public int[] board;        // 0 is empty, 1 is blue and 2 is red
+    private static int punishRate;
+    public int[] board;        // 0 is empty, 1 is blue and -1 is red
     private UnionFindForest<Integer> redForest = new UnionFindForest<>(); // player 2
     private UnionFindForest<Integer> blueForest = new UnionFindForest<>();// player 1
 
-    public HexBoard(int rows, int columns){
+    public HexBoard(int rows, int columns, int punishRate){
+        HexBoard.punishRate = punishRate;
         HexBoard.rows = rows;
         HexBoard.columns = columns;
         board = new int[rows*columns +1];
@@ -29,13 +31,15 @@ public class    HexBoard {
 
     /**
      * Allows to set the board and refreshes the neighbor forests for the set tile
-     * @return returns -1 if the attempted move is invalid, returns 1 if blue won, 2 if red won
+     * @return returns -1 if the attempted move is invalid, returns 1 if blue won, -1 if red won
      * otherwise, returns 0 if the move was recorded and valid
+     * returns punishRate if the move was invalid.
      */
     public int setBoard(int loc, int player){
-        Integer playerSpot = board[loc];
-        if (playerSpot != null && playerSpot!=0){
-            return -1;
+        int playerSpot = board[loc];
+
+        if (playerSpot!=0){
+            return punishRate;
         }
 
         int[] neighborPlayerPieces = getNeighborPlayerPieces(loc, player);
@@ -43,11 +47,11 @@ public class    HexBoard {
 
         if (player==1) {
             if (refreshForest(blueForest, loc, neighborPlayerPieces)){
-                return 1;
+                return 100;
             }
         } else{
             if (refreshForest(redForest, loc, neighborPlayerPieces)){
-                return 2;
+                return -100;
             }
         }
 
@@ -64,7 +68,7 @@ public class    HexBoard {
                 continue;
             forest.union(loc, neighborPlayerPieces[i]);
         }
-        if (forest.find(-1)==forest.find(-2) && forest.find(-1)!=null){  // if the two borders are connected
+        if (forest.find(-2)==forest.find(-3) && forest.find(-2)!=null){  // if the two borders are connected
             return true;
         }
         return false;
@@ -91,14 +95,14 @@ public class    HexBoard {
     private int[] getBorders(int[] out, int loc, int player){
         if (player==1){
             if (isOnLeftBorder(loc))
-                out[0] = -1;                    // left border for blue pieces counts as a valid piece
+                out[0] = -2;                    // left border for blue pieces counts as a valid piece
             else if (isOnRightBorder(loc))
-                out[1] = -2;
-        } else if (player==2){
+                out[1] = -3;
+        } else if (player==-1){
             if (isOnTopBorder(loc))
-                out[2] = -1;
+                out[2] = -2;
             else if (isOnLowBorder(loc))
-                out[4] = -2;
+                out[4] = -3;
         }
         return out;
     }

@@ -43,7 +43,7 @@ public class TrainHexGame {
 	private TrainHexGame() {}
 
 	public static void main(String[] args) throws IOException {
-		TrainHexGame.run(500, 1);
+		TrainHexGame.run(500, 20);
 	}
 
 	public static TrainingResult run(int epoch, int batchSize) throws IOException {

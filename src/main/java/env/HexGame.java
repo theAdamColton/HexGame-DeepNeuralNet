@@ -40,7 +40,8 @@ public class HexGame implements RlEnv {
 
 	@Override
 	public void reset() {
-		this.state = new State(rows, columns);		// makes a new PlayHex object
+		state.boardGame = new PlayHex(rows, columns);		// makes a new PlayHex object
+		state.turn=1;
 	}
 
 	@Override
@@ -65,8 +66,9 @@ public class HexGame implements RlEnv {
 		int move = action.singletonOrThrow().getInt();
 
 		State preState = state;
-		state = new State(rows, columns, state.boardGame);
-		state.winner = state.boardGame.setMove(move);
+
+		state.winner = state.move(move);
+		state.turn   = -state.turn;
 
 		HexGameStep step = new HexGameStep(manager.newSubManager(), preState, state, action);
 		if (isTraining){
@@ -124,35 +126,40 @@ public class HexGame implements RlEnv {
 		public NDArray getReward() { return manager.create((float) postState.getWinner()); }
 
 		@Override
-		public boolean isDone() { return postState.isDraw() || postState.getWinner() != 0; }
+		public boolean isDone() {
+			return postState.isDraw() || postState.getWinner() != 0; }
+
 
 		@Override
 		public void close() { manager.close(); }
 	}
 
-	private static final class State{
+	private static class State{
 
 		PlayHex boardGame;
-		int turn;
+		int turn =1;			// blue always starts
 		int winner = 0;			// is set to either 1 or 2 if blue or red wins
 		private final int rows;
 		private final int columns;
 
 		private State(int rows, int columns, PlayHex boardGame){
+			System.out.println("Being Constructed!");
 			this.boardGame = boardGame;
-
 			this.rows = rows;
 			this.columns = columns;
 		}
 		private State(int rows, int columns){
+			System.out.println("Being Constructed!");
 			this.boardGame = new PlayHex(rows, columns);
-			this.turn = boardGame.player %2 +1;
 			this.rows = rows;
 			this.columns = columns;
 		}
 
+		private int move(int loc){
+			return boardGame.setMove(loc, turn);
+		}
+
 		private NDList getObservation(NDManager manager){
-			this.turn = boardGame.player %2 +1;
 			return new NDList(manager.create(boardGame.getBoardList()), manager.create(turn));
 		}
 
@@ -169,7 +176,9 @@ public class HexGame implements RlEnv {
 
 		private int getWinner(){ return winner; }
 
-		private boolean isDraw(){ return boardGame.isDraw(); }
+		private boolean isDraw(){
+			if (DEBUG_MODE && boardGame.isDraw())System.out.println("Draw!");
+			return boardGame.isDraw(); }
 
 		@Override
 		public String toString(){ return boardGame.toString(); }
