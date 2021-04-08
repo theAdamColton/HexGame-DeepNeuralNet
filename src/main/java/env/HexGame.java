@@ -13,13 +13,13 @@ import org.slf4j.LoggerFactory;
 import game.PlayHex;
 
 public class HexGame implements RlEnv {
-	private static final boolean DEBUG_MODE = true;
-	private NDManager manager;
-	private ReplayBuffer replayBuffer;
+	private static final boolean DEBUG_MODE = false;
+	private final NDManager manager;
+	private final ReplayBuffer replayBuffer;
 	private State state;
 
-	private int rows;
-	private int columns;
+	private final int rows;
+	private final int columns;
 
 
 	/**
@@ -61,11 +61,13 @@ public class HexGame implements RlEnv {
 	 */
 	@Override
 	public Step step(NDList action, boolean isTraining) {
+		if (DEBUG_MODE) System.out.println("action NDList:" +action.toString());
 		int move = action.singletonOrThrow().getInt();
 
 		State preState = state;
-
+		state = new State(rows, columns, state.boardGame);
 		state.winner = state.boardGame.setMove(move);
+
 		HexGameStep step = new HexGameStep(manager.newSubManager(), preState, state, action);
 		if (isTraining){
 			replayBuffer.addStep(step);
@@ -73,10 +75,10 @@ public class HexGame implements RlEnv {
 		return step;
 	}
 
-	@Override
-	public float runEnvironment(RlAgent agent, boolean training) {
-		return RlEnv.super.runEnvironment(agent, training);
-	}
+	//@Override
+	//public float runEnvironment(RlAgent agent, boolean training) {
+	//	return RlEnv.super.runEnvironment(agent, training);
+	//}
 
 	@Override
 	public Step[] getBatch() {
@@ -94,10 +96,10 @@ public class HexGame implements RlEnv {
 	}
 
 	static final class HexGameStep implements RlEnv.Step {
-		private NDManager manager;
-		private State preState;
-		private State postState;
-		private NDList action;
+		private final NDManager manager;
+		private final State preState;
+		private final State postState;
+		private final NDList action;
 
 		private HexGameStep(NDManager manager, State preState, State postState, NDList action){
 			this.manager = manager;
@@ -133,10 +135,20 @@ public class HexGame implements RlEnv {
 		PlayHex boardGame;
 		int turn;
 		int winner = 0;			// is set to either 1 or 2 if blue or red wins
+		private final int rows;
+		private final int columns;
 
+		private State(int rows, int columns, PlayHex boardGame){
+			this.boardGame = boardGame;
+
+			this.rows = rows;
+			this.columns = columns;
+		}
 		private State(int rows, int columns){
 			this.boardGame = new PlayHex(rows, columns);
 			this.turn = boardGame.player %2 +1;
+			this.rows = rows;
+			this.columns = columns;
 		}
 
 		private NDList getObservation(NDManager manager){
@@ -146,8 +158,12 @@ public class HexGame implements RlEnv {
 
 		private ActionSpace getActionSpace(NDManager manager){
 			ActionSpace actionSpace = new ActionSpace();
-			actionSpace.add(new NDList(manager.create(boardGame.getBoardList())));
-			if (DEBUG_MODE) System.out.println(actionSpace);
+			for (int i = 0; i < rows * columns; i++) {
+				if (boardGame.getBoardList()[i] == 0) {
+					actionSpace.add(new NDList(manager.create(i)));
+				}
+			}
+			if (DEBUG_MODE) System.out.println("actionSpace:" +actionSpace);
 			return actionSpace;
 		}
 

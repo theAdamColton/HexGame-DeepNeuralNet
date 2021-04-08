@@ -13,17 +13,14 @@ import java.util.Arrays;
  * Allows instantiation of the game and control of the turns.
  */
 public class PlayHex {
-    static final boolean DEBUG = true;
+    static final boolean DEBUG = false;
     static final String RESOURCE_PATH = "src/main/resources/";
     static boolean isVisible = true;                                                           // this controls whether the board is printed out
     public HexBoard HexBoard;
     public int player = 2;                                                                    // 1 is blue, 2 is red. This variable will always be the player who just went.
     public int moves =0;
     public int maxMoves;
-    public PlayHex(){
-        this.HexBoard = new HexBoard(11,11);
-        maxMoves = 11*11;
-    }                   // defaults to 11x11
+
     public PlayHex(int rows, int columns){
         maxMoves = rows*columns;
         this.HexBoard = new HexBoard(rows, columns);

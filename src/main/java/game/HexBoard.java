@@ -11,6 +11,7 @@ package game; /**
  * If numbering from 1 to the total hex size (hex size = height* width),
  * neighbors are location -1 , location +1, location - width, location - width+1, location + width, location + width -1
  */
+import java.util.Arrays;
 import java.util.Hashtable;
 public class    HexBoard {
 
@@ -75,7 +76,10 @@ public class    HexBoard {
     public int[] getNeighborPlayerPieces(int loc, int player){
         int[] out = new int[6];
         int[] locs = getNeighbors(loc);
+
+
         for (int i = 0; i < locs.length; i++){
+            if (locs[i] <=0) continue;
             Integer currLoc = board[locs[i]];
             if (currLoc!=null&&currLoc==player){
                 out[i] = locs[i];
