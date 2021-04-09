@@ -15,15 +15,19 @@ import java.util.Arrays;
 public class PlayHex {
     static final boolean DEBUG = false;
     static final String RESOURCE_PATH = "src/main/resources/";
-    static boolean isVisible = true;                                                           // this controls whether the board is printed out
+    static boolean isVisible = false;                                                           // this controls whether the board is printed out
     public HexBoard HexBoard;
     public int moves =0;
     public int maxMoves;
-    static final int punishRate= -1;                  // the punishment rate for picking an occupied location, same punishment as loosing
+    private final int rewardRate = 1;
 
     public PlayHex(int rows, int columns){
         maxMoves = rows*columns;
-        this.HexBoard = new HexBoard(rows, columns, punishRate);
+        // the punishment rate for picking an occupied location, same punishment as loosing. Setting this to 0 will break stuff
+        int punishRate = 0;
+        int rewardRate = 0;
+        int winGameReward = 1;
+        HexBoard = new HexBoard(rows, columns, punishRate, rewardRate, winGameReward);
     }
 
     /**
@@ -33,16 +37,18 @@ public class PlayHex {
      * @return 0 if the attempted move was valid, punishRate if the move was invalid, returns 100 if blue won, -100 if red won
      */
     public int setMove(int location, int player) {
+        int result = HexBoard.setBoard(location+1,player);
 
         if (isVisible) {
-            System.out.printf("Player %d takes: %d %n",player, location);
+            System.out.printf("Player %d takes: %d \t Reward was %d %n",player, location, result);
+            System.out.println(HexBoard.toString());
         }
 
-        int result = HexBoard.setBoard(location,player);
 
-        if (result == 0){       // if the move was valid and recorded, and non winning.
+        if (HexBoard.wasValid){       // if the move was valid and recorded, and non winning.
             moves++;
         }
+
         return result;
     }
 

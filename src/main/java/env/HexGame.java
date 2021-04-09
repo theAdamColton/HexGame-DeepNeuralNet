@@ -3,7 +3,6 @@ package env;
 import ai.djl.modality.rl.ActionSpace;
 import ai.djl.modality.rl.LruReplayBuffer;
 import ai.djl.modality.rl.ReplayBuffer;
-import ai.djl.modality.rl.agent.RlAgent;
 import ai.djl.modality.rl.env.RlEnv;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
@@ -12,11 +11,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import game.PlayHex;
 
+import java.util.Arrays;
+
 public class HexGame implements RlEnv {
 	private static final boolean DEBUG_MODE = false;
 	private final NDManager manager;
 	private final ReplayBuffer replayBuffer;
 	private State state;
+	public static int stepCount;
 
 	private final int rows;
 	private final int columns;
@@ -38,10 +40,15 @@ public class HexGame implements RlEnv {
 		this.replayBuffer = replayBuffer;
 	}
 
+	public int getTurn(){
+		return state.turn;
+	}
+
 	@Override
 	public void reset() {
-		state.boardGame = new PlayHex(rows, columns);		// makes a new PlayHex object
-		state.turn=1;
+		this.state = new State(rows, columns);		// makes a new PlayHex object
+		state.turn = -1;
+		stepCount = 0;
 	}
 
 	@Override
@@ -62,18 +69,31 @@ public class HexGame implements RlEnv {
 	 */
 	@Override
 	public Step step(NDList action, boolean isTraining) {
-		if (DEBUG_MODE) System.out.println("action NDList:" +action.toString());
 		int move = action.singletonOrThrow().getInt();
 
-		State preState = state;
+		//System.out.println("attempting..board["+move+"]"+"="+state.boardGame.getBoardList()[move]);
+		//System.out.println(Arrays.toString(state.boardGame.getBoardList()));
 
-		state.winner = state.move(move);
+		if (state.boardGame.getBoardList()[move]!=0){
+			throw new IllegalArgumentException("Attempted move is on an occupied space!");
+		}
+		State preState = new State(state.boardGame.getBoardList());
+
+
+		//if (DEBUG_MODE) System.out.printf("p%2dr%2d,", state.turn, state.winner);
+
 		state.turn   = -state.turn;
+		state.move(move);
+
+		//System.out.println("Moved.");
+		//System.out.println("board["+move+"]"+"="+ state.boardGame.getBoardList()[move]);
+		//System.out.println("prestate["+move+"]"+"="+ preState.board[move]);
 
 		HexGameStep step = new HexGameStep(manager.newSubManager(), preState, state, action);
 		if (isTraining){
 			replayBuffer.addStep(step);
 		}
+		stepCount++;
 		return step;
 	}
 
@@ -123,11 +143,15 @@ public class HexGame implements RlEnv {
 		public ActionSpace getPostActionSpace() { return postState.getActionSpace(manager);}
 
 		@Override
-		public NDArray getReward() { return manager.create((float) postState.getWinner()); }
+		public NDArray getReward() {
+			return manager.create((float) postState.getWinner()); }
 
 		@Override
 		public boolean isDone() {
-			return postState.isDraw() || postState.getWinner() != 0; }
+			boolean result = postState.isDraw() || postState.getWinner() !=0;	//TODO
+			if (result)
+				if (DEBUG_MODE)System.out.printf("%nPlayer %2d won Hex! %d steps%n", preState.turn, stepCount);
+			return  result;}
 
 
 		@Override
@@ -136,41 +160,41 @@ public class HexGame implements RlEnv {
 
 	private static class State{
 
-		PlayHex boardGame;
-		int turn =1;			// blue always starts
-		int winner = 0;			// is set to either 1 or 2 if blue or red wins
-		private final int rows;
-		private final int columns;
+		private PlayHex boardGame;
+		int turn;			// blue always starts
+		int winner;			// is set to either 1 or 2 if blue or red wins
+		private int rows;
+		private int columns;
+		private int[] board;
 
-		private State(int rows, int columns, PlayHex boardGame){
-			System.out.println("Being Constructed!");
-			this.boardGame = boardGame;
-			this.rows = rows;
-			this.columns = columns;
+		private State(int[] board){
+			this.board = board;
 		}
 		private State(int rows, int columns){
-			System.out.println("Being Constructed!");
-			this.boardGame = new PlayHex(rows, columns);
+			boardGame = new PlayHex(rows, columns);
 			this.rows = rows;
 			this.columns = columns;
 		}
 
-		private int move(int loc){
-			return boardGame.setMove(loc, turn);
+		private void move(int loc){
+			//System.out.println("Moving " +turn + " to " + loc);
+			this.winner = boardGame.setMove(loc, turn);
 		}
 
 		private NDList getObservation(NDManager manager){
-			return new NDList(manager.create(boardGame.getBoardList()), manager.create(turn));
+			if (board==null){
+				board = boardGame.getBoardList();
+			}
+			return new NDList(manager.create(board), manager.create(turn));
 		}
 
 		private ActionSpace getActionSpace(NDManager manager){
 			ActionSpace actionSpace = new ActionSpace();
-			for (int i = 0; i < rows * columns; i++) {
-				if (boardGame.getBoardList()[i] == 0) {
+			for (int i = 0; i < boardGame.getBoardList().length; i++) {
+				if (boardGame.getBoardList()[i]==0){
 					actionSpace.add(new NDList(manager.create(i)));
 				}
 			}
-			if (DEBUG_MODE) System.out.println("actionSpace:" +actionSpace);
 			return actionSpace;
 		}
 
@@ -186,13 +210,13 @@ public class HexGame implements RlEnv {
 	}
 
 	/**
-	 * Run this to tesst if your mxnet installation and your NDanager starts correctly.
+	 * Run this to tesst if your mxnet installation and your NDmanager starts correctly.
 	 */
 	public static void main(String[] args) {
 		Logger logger = LoggerFactory.getLogger(HexGame.class);
-		State state = new State(11,11);
+		//State state = new State(11,11);
 		NDManager manager = NDManager.newBaseManager();
-		System.out.println(state.getObservation(manager));
-		state.getActionSpace(manager);
+		//System.out.println(state.getObservation(manager));
+		//state.getActionSpace(manager);
 	}
 }

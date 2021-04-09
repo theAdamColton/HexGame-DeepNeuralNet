@@ -15,14 +15,19 @@ import java.util.Arrays;
 import java.util.Hashtable;
 public class    HexBoard {
 
+    public boolean wasValid;
+
     private static int rows;
     private static int columns;
     private static int punishRate;
+    private static int rewardRate;
+    private static int winGameReward = 1;
+    private static boolean shouldColor = false;
     public int[] board;        // 0 is empty, 1 is blue and -1 is red
     private UnionFindForest<Integer> redForest = new UnionFindForest<>(); // player 2
     private UnionFindForest<Integer> blueForest = new UnionFindForest<>();// player 1
 
-    public HexBoard(int rows, int columns, int punishRate){
+    public HexBoard(int rows, int columns, int punishRate, int rewardRate, int winGameReward){
         HexBoard.punishRate = punishRate;
         HexBoard.rows = rows;
         HexBoard.columns = columns;
@@ -39,6 +44,7 @@ public class    HexBoard {
         int playerSpot = board[loc];
 
         if (playerSpot!=0){
+            wasValid = false;
             return punishRate;
         }
 
@@ -47,15 +53,16 @@ public class    HexBoard {
 
         if (player==1) {
             if (refreshForest(blueForest, loc, neighborPlayerPieces)){
-                return 100;
+                return winGameReward;
             }
         } else{
             if (refreshForest(redForest, loc, neighborPlayerPieces)){
-                return -100;
+                return -1 * winGameReward;
             }
         }
 
-        return 0;
+        wasValid = true;
+        return rewardRate;
     }
 
     /**
@@ -68,7 +75,7 @@ public class    HexBoard {
                 continue;
             forest.union(loc, neighborPlayerPieces[i]);
         }
-        if (forest.find(-2)==forest.find(-3) && forest.find(-2)!=null){  // if the two borders are connected
+        if (forest.find(-2) !=null && forest.find(-2)==forest.find(-3)){  // if the two borders are connected
             return true;
         }
         return false;
@@ -161,9 +168,14 @@ public class    HexBoard {
             return "" + 0;
         }
         else if (board[location]==1){
-            return "\u001B[34m" + "B" + "\u001B[0m";
+            if (shouldColor)
+                return "\u001B[34m" + "B" + "\u001B[0m";
+            else return "B";
         } else {
-            return "\u001B[31m" + "R" + "\u001B[0m";
+            if (shouldColor)
+                return "\u001B[31m" + "R" + "\u001B[0m";
+            else
+                return "R";
         }
     }
     private boolean isOnTopBorder(int loc){
