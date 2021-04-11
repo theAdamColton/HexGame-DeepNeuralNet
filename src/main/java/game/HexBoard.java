@@ -20,7 +20,7 @@ public class    HexBoard {
     private static int rows;
     private static int columns;
     private static int punishRate;
-    private static int rewardRate;
+    private static int rewardRate = 0;
     private static int winGameReward = 1;
     private static boolean shouldColor = false;
     public int[] board;        // 0 is empty, 1 is blue and -1 is red
