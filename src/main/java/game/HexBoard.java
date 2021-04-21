@@ -13,16 +13,13 @@ package game; /**
  */
 import java.util.Arrays;
 import java.util.Hashtable;
-public class    HexBoard {
+class HexBoard {
 
     public boolean wasValid;
 
     private static int rows;
     private static int columns;
     private static int punishRate;
-    private static int rewardRate = 0;
-    private static int winGameReward = 1;
-    private static boolean shouldColor = false;
     public int[] board;        // 0 is empty, 1 is blue and -1 is red
     private UnionFindForest<Integer> redForest = new UnionFindForest<>(); // player 2
     private UnionFindForest<Integer> blueForest = new UnionFindForest<>();// player 1
@@ -51,6 +48,7 @@ public class    HexBoard {
         int[] neighborPlayerPieces = getNeighborPlayerPieces(loc, player);
         board[loc] = player;
 
+        int winGameReward = 1;
         if (player==1) {
             if (refreshForest(blueForest, loc, neighborPlayerPieces)){
                 return winGameReward;
@@ -62,7 +60,7 @@ public class    HexBoard {
         }
 
         wasValid = true;
-        return rewardRate;
+        return 0;
     }
 
     /**
@@ -91,8 +89,8 @@ public class    HexBoard {
 
         for (int i = 0; i < locs.length; i++){
             if (locs[i] <=0) continue;
-            Integer currLoc = board[locs[i]];
-            if (currLoc!=null&&currLoc==player){
+            //Integer currLoc = board[locs[i]];
+            if (board[locs[i]]==player){
                 out[i] = locs[i];
             }
         }
@@ -164,6 +162,7 @@ public class    HexBoard {
     }
 
     private String hexSquare(int location){
+        boolean shouldColor = true;
         if (board[location]==0){
             return "" + 0;
         }

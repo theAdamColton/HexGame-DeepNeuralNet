@@ -52,24 +52,38 @@ public final class TrainHexGame {
 		run(args);
 	}
 
-	public static TrainingResult run(String[] args) throws IOException {
+	public static void run(String[] args) throws IOException {
 		Arguments arguments = new Arguments().parseArgs(args);
-		if (arguments==null){
-			return null;
+		if (arguments == null) {
+			return;
 		}
+		int closeMgnEveryXEpochs = arguments.getCloseEveryX();            // this is a flimsy hack
 
 		int epoch = arguments.getEpoch();
 		int validationGamesPerEpoch = 1;
 		int saveEveryXEpochs = arguments.getSaveEveryX();
 		int batchSize = arguments.getBatchSize();
-		int closeMgnEveryXEpochs = arguments.getCloseEveryX();			// this is a flimsy hack
-		float rewardDiscount = 0.6f;
-		int replayBufferSize = rows*columns;	// It is impossible to tie the game of Hex, so the maximum buffer size is the size of the board
+		float rewardDiscount = 0.3f;
+		int replayBufferSize = rows * columns;    // It is impossible to tie the game of Hex, so the maximum buffer size is the size of the board
 		int gamesPerEpoch = arguments.getGamesPerEpoch(); //
 		String modelPath = arguments.getModelPath();
 
 		boolean shouldLoad = true;
 
+		long startTime = System.currentTimeMillis();
+		for (int i =0; i < epoch; i++){
+			runXEpochs(closeMgnEveryXEpochs, validationGamesPerEpoch, saveEveryXEpochs, batchSize,
+					rewardDiscount, replayBufferSize, gamesPerEpoch, modelPath, shouldLoad);
+			logger.info("Average total training time of one move {}", (System.currentTimeMillis() - startTime) /
+					((float)(i+1)*gamesPerEpoch*batchSize));
+		}
+
+	}
+
+	private static TrainingResult runXEpochs(int epoch, int validationGamesPerEpoch, int saveEveryXEpochs,
+											 int batchSize, float rewardDiscount, int replayBufferSize,
+											 int gamesPerEpoch, String modelPath, boolean shouldLoad) throws IOException
+	{
 		HexGame game = new HexGame(NDManager.newBaseManager(), batchSize, replayBufferSize, rows, columns);
 
 		Block  block = getBlock();
@@ -80,7 +94,7 @@ public final class TrainHexGame {
 		if (shouldLoad){
 			try {
 				loadModel(model);
-			} catch (MalformedModelException e) {
+			} catch (MalformedModelException | IOException e) {
 				System.out.println(Arrays.toString(e.getStackTrace()));
 			}
 		}
@@ -91,21 +105,17 @@ public final class TrainHexGame {
 		Trainer trainer = model.newTrainer(config);
 		trainer.initialize(new Shape(batchSize, rows*columns), new Shape(batchSize), new Shape(batchSize));
 
-		trainer.notifyListeners(listener -> listener.onTrainingBegin(trainer));
-
 		RlAgent agent = new QAgent(trainer, rewardDiscount);
 		Tracker exploreRate =
 				LinearTracker.builder()						// this sets a declining ramp rate for the exploring
-						.setBaseValue(0.9f)
-						.optSlope(-.9f / (1000 * gamesPerEpoch * 7))
-						.optMinValue(0.01f)
+						.setBaseValue(0.5f)
+						.optSlope(-.8f / (100 * gamesPerEpoch * 7))
+						.optMinValue(0.02f)
 						.build();
 		agent = new EpsilonGreedy(agent, exploreRate);
 
 		float validationWinRate = 0;
 		float trainWinRate = 0;
-
-		long startTime = System.currentTimeMillis();
 
 		for (int i = 0; i < epoch; i++) {
 			logger.info("Starting train... "+(i+1));
@@ -113,7 +123,7 @@ public final class TrainHexGame {
 
 			long epochStartTime = System.currentTimeMillis();
 			// This is done to lighten resource load
-			int showDetailsEveryJ = gamesPerEpoch / 30;
+			int showDetailsEveryJ = gamesPerEpoch / 50;
 
 			// Initializes the progress bar
 			ProgressBar progressBar = new ProgressBar("" + gamesPerEpoch, gamesPerEpoch+1);
@@ -125,7 +135,7 @@ public final class TrainHexGame {
 				if (j % showDetailsEveryJ == 0){
 					if (j==0) continue;
 					progressBar.update(j+1, ((System.currentTimeMillis() - epochStartTime) /
-							(float)j) / batchSize +"ms per game");
+							(float)j) / batchSize +"ms per move");
 				}
 
 				// Runs the simulation
@@ -141,11 +151,9 @@ public final class TrainHexGame {
 			}
 			progressBar.end();
 
+
 			trainWinRate = (float) trainingWins / gamesPerEpoch;
-			logger.info("Result of {} total rounds; Training wins: {}; Running training time per game {}",
-					(i+1)*gamesPerEpoch*batchSize, trainWinRate, (System.currentTimeMillis() - startTime) /
-							((float)(i+1)*gamesPerEpoch*batchSize));
-			trainer.notifyListeners(listener -> listener.onEpoch(trainer));
+			logger.info("{} total moves; Training wins: {}",(i+1)*gamesPerEpoch*batchSize , trainWinRate);
 
 			// Counts win rate after playing {validationGamesPerEpoch} games
 			int validationWins = 0;
@@ -158,30 +166,27 @@ public final class TrainHexGame {
 			validationWinRate = (float) validationWins / validationGamesPerEpoch;
 			logger.info("Validation wins: {}", validationWinRate);
 
-			if ((i+1)%saveEveryXEpochs==0)
-				saveModel(model);
+			saveModel(model);
 
-			if ((i+1)%closeMgnEveryXEpochs==0)
-				game.close();		//TODO
 		}
 
-		trainer.notifyListeners(listener -> listener.onTrainingEnd(trainer));
 		TrainingResult trainingResult = trainer.getTrainingResult();
 		trainingResult.getEvaluations().put("validate_winRate", validationWinRate);
 		trainingResult.getEvaluations().put("train_winRate", trainWinRate);
 
 		model.close();
+		trainer.close();
+		game.close();
+
 		return trainingResult;
 	}
 
 	private static void saveModel(Model model) throws IOException {
 		logger.info("Saving model...");
 		model.save(Paths.get(MODEL_PATH), "Hex-Game!");
-		logger.info("Saved.");
 	}
 
 	private static void loadModel(Model model) throws MalformedModelException, IOException {
-		logger.info("Loading Model....");
 		model.load(Paths.get(MODEL_PATH), "Hex-Game!");
 		logger.info("Loaded model "+ model.getModelPath()+"/"+model.getName());
 	}

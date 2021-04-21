@@ -13,6 +13,7 @@ import game.PlayHex;
 
 import javax.sound.midi.Soundbank;
 import java.util.Arrays;
+import java.util.Random;
 
 public class HexGame implements RlEnv {
 	private static final boolean DEBUG_GAME_MODE = false;			// prints debug info for every game that is finished
@@ -37,7 +38,7 @@ public class HexGame implements RlEnv {
 	public HexGame(NDManager manager, int batchSize, int replayBufferSize, int rows, int columns){
 		this.manager = manager;
 		manager.setName("HexGame Manager");
-		this.state = new State(rows, columns);
+		this.state = new State(manager.newSubManager(), rows, columns);
 		this.rows = rows;
 		this.columns = columns;
 		HexGame.batchSize = batchSize;
@@ -47,23 +48,38 @@ public class HexGame implements RlEnv {
 
 	@Override
 	public void reset() {
-		state = new State(rows, columns);		// makes a new PlayHex object
-		state.turn = -1;
+		state = new State(manager.newSubManager(), rows, columns);		// makes a new PlayHex object
+		Random rnd = new Random();
+		state.turn = -1 + 2*rnd.nextInt(2);		// sets state to a random -1 or 1
 		stepCount = 0;
 	}
 
 	// memory leak?
 	@Override
 	public NDList getObservation() {
-		return state.getObservation(manager);
+		return state.getObservation();
 	}
 
 	// i think memory leak is from here?
 	@Override
 	public ActionSpace getActionSpace() {
-		return state.getActionSpace(manager);
+		return state.getActionSpace();
 
 	}
+
+	/**
+	 * Allows a human to make a move
+	 * @param  loc position of the board to take
+	 * @return true if the move was valid
+	 */
+	public boolean move(int loc){
+		return state.move(loc);
+	}
+
+	public int getWinner(){
+		return state.getWinner();
+	}
+
 
 	/**
 	 * A single step in the training or implementation of the agent.
@@ -73,7 +89,7 @@ public class HexGame implements RlEnv {
 	 */
 	@Override
 	public Step step(NDList action, boolean isTraining) {
-		action.detach();
+		//action.detach();
 		int move = action.singletonOrThrow().getInt();
 		if (DEBUG_STEP_MODE){
 			System.out.printf("attempting player %d board[%d]=%d%n", state.turn*-1, move, state.boardGame.getBoardList()[move]);
@@ -83,9 +99,8 @@ public class HexGame implements RlEnv {
 		if (state.boardGame.getBoardList()[move]!=0){
 			throw new IllegalArgumentException("Attempted move is on an occupied space!");
 		}
-		State preState = new State(state.boardGame.getBoardList());
+		State preState = new State(manager.newSubManager(), state.boardGame.getBoardList());
 
-		state.turn   = -state.turn;
 		state.move(move);
 
 		if (DEBUG_STEP_MODE){
@@ -106,7 +121,9 @@ public class HexGame implements RlEnv {
 
 	@Override
 	public Step[] getBatch() {
-		return replayBuffer.getBatch();
+		Step[] tmp = replayBuffer.getBatch();
+		replayBuffer = new LruReplayBuffer(batchSize, bufferSize);
+		return tmp;
 	}
 
 	@Override
@@ -146,16 +163,16 @@ public class HexGame implements RlEnv {
 		}
 
 		@Override
-		public NDList getPreObservation() { return preState.getObservation(manager);}
+		public NDList getPreObservation() { return preState.getObservation();}
 
 		@Override
 		public NDList getAction() { return action; }
 
 		@Override
-		public NDList getPostObservation() { return postState.getObservation(manager);}
+		public NDList getPostObservation() { return postState.getObservation();}
 
 		@Override
-		public ActionSpace getPostActionSpace() { return postState.getActionSpace(manager);}
+		public ActionSpace getPostActionSpace() { return postState.getActionSpace();}
 
 		@Override
 		public NDArray getReward() {
@@ -163,44 +180,46 @@ public class HexGame implements RlEnv {
 
 		@Override
 		public boolean isDone() {
-			boolean result = postState.isDraw() || postState.getWinner() !=0;	//TODO
-			if (result)
-				if (DEBUG_GAME_MODE) {
-					if (postState.isDraw())
-						System.out.printf("Draw! %d steps%n", stepCount);
-					else
-						System.out.printf("Player %2d won Hex! %d steps, rewarding %d%n", postState.turn, stepCount, postState.getWinner());
-				}
-			return  result;}
+			return postState.getWinner() != 0;
+		}
 
 		@Override
 		public void close() {
 			if (DEBUG_STEP_MODE)
 				System.out.println("closing! "+manager.getName());
+			preState.subMgr.close();
+			postState.subMgr.close();
 			manager.close(); }
 	}
 
 	private static final class State{
 
-		private PlayHex boardGame;
+		private final PlayHex boardGame;
 		int turn;					// blue always starts
 		int winner;					// is set to either 1 or 2 if blue or red wins
 		private int[] board;		// the board list. Only exists for the preState State in the step.
+		private NDManager subMgr;	// the sub manager for the State. Close after use!
 
-		private State(int[] board){
+		private State(NDManager subMgr, int[] board){		// This constructor is only used for the preState
+			this.subMgr = subMgr;
 			this.board = board;
-		}		// This constructor is only used for the preState
-		private State(int rows, int columns){
-			boardGame = new PlayHex(rows, columns);
+			boardGame = null;
+		}
+		private State(NDManager subMgr, int rows, int columns) {
+			this.subMgr = subMgr;
+			this.boardGame = new PlayHex(rows, columns);
 		}
 
-		private void move(int loc){
-			//System.out.println("Moving " +turn + " to " + loc);
+		/**
+		 * @return true if move was valid
+		 */
+		private boolean move(int loc){
+			turn   = -turn;
 			this.winner = boardGame.setMove(loc, turn);
+			return boardGame.wasValid();
 		}
 
-		private NDList getObservation(NDManager manager){
-			NDManager subMgr = manager.newSubManager();
+		private NDList getObservation(){
 			if (board==null){
 				board = boardGame.getBoardList();
 			}
@@ -208,22 +227,17 @@ public class HexGame implements RlEnv {
 		}
 
 		// memory leak is here? something with the manager not closing when called from HexGame getActionSpace?
-		private ActionSpace getActionSpace(NDManager manager){
-			NDManager subMng = manager.newSubManager();
+		private ActionSpace getActionSpace(){
 			ActionSpace actionSpace = new ActionSpace();
 			for (int i = 0; i < boardGame.getBoardList().length; i++) {
 				if (boardGame.getBoardList()[i]==0){
-					actionSpace.add(new NDList(subMng.create(i)));
+					actionSpace.add(new NDList(subMgr.create(i)));
 				}
 			}
 			return actionSpace;
 		}
 
 		private int getWinner(){ return winner; }
-
-		private boolean isDraw(){
-			if (DEBUG_GAME_MODE && boardGame.isDraw())System.out.println("Draw!");
-			return boardGame.isDraw(); }
 
 		@Override
 		public String toString(){ return boardGame.toString(); }

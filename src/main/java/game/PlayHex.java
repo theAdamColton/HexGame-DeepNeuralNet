@@ -16,8 +16,7 @@ public class PlayHex {
     static final boolean DEBUG = false;
     static final String RESOURCE_PATH = "src/main/resources/";
     static boolean isVisible = false;                                                           // this controls whether the board is printed out
-    public HexBoard HexBoard;
-    public int moves =0;
+    private final HexBoard HexBoard;
     public int maxMoves;
     private final int rewardRate = 1;
 
@@ -37,19 +36,11 @@ public class PlayHex {
      * @return 0 if the attempted move was valid, punishRate if the move was invalid, returns 100 if blue won, -100 if red won
      */
     public int setMove(int location, int player) {
-        int result = HexBoard.setBoard(location+1,player);
+        return HexBoard.setBoard(location+1,player);
+    }
 
-        if (isVisible) {
-            System.out.printf("Player %d takes: %d \t Reward was %d %n",player, location, result);
-            System.out.println(HexBoard.toString());
-        }
-
-
-        if (HexBoard.wasValid){       // if the move was valid and recorded, and non winning.
-            moves++;
-        }
-
-        return result;
+    public boolean wasValid(){
+        return HexBoard.wasValid;
     }
 
     /**
@@ -59,13 +50,6 @@ public class PlayHex {
         if (DEBUG) System.out.println("getting board: " +
                 Arrays.toString(Arrays.copyOfRange(HexBoard.board, 1, HexBoard.board.length)));
         return Arrays.copyOfRange(HexBoard.board, 1, HexBoard.board.length);          // index 0 is never used so it is removed.
-    }
-
-    /**
-     * @return True if the game is a draw and the board is saturated.
-     */
-    public boolean isDraw(){
-        return moves>=maxMoves;
     }
 
     /**
